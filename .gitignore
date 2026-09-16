@@ -1,0 +1,5 @@
+# Git ignore for GymTracker
+*.zip
+*.tmp
+.DS_Store
+Thumbs.db

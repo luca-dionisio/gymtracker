@@ -1,0 +1,16 @@
+{
+  "name": "GymTracker Pro - Scheda A, B, C",
+  "short_name": "GymTracker",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
