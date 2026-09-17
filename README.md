@@ -13,8 +13,6 @@ L'applicazione è configurata con un profilo utente iniziale predefinito:
 - **Email / Nome Utente:** `dionisio.luca@gmail.com`
 - **Password:** `andersen`
 
-È inoltre presente il pulsante **"⚡ Accesso rapido (Luca)"** nella schermata di login per accedere con un singolo tocco su smartphone.
-
 ### Profili Multi-Utente
 - È possibile creare ulteriori account dalla schermata **"Registrati"** (es. per compagni di allenamento o personal trainer).
 - Ciascun utente ha il proprio database segregato in localStorage (`gym_tracker_{userId}_history`, `gym_tracker_{userId}_active`):

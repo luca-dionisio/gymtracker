@@ -330,19 +330,6 @@ const App = {
       });
     }
 
-    // Accesso rapido 1-tap preimpostato per Luca Dionisio
-    const btnQuickLuca = document.getElementById("btnQuickLoginLuca");
-    if (btnQuickLuca) {
-      btnQuickLuca.addEventListener("click", (e) => {
-        e.preventDefault();
-        const userField = document.getElementById("loginUsername");
-        const passField = document.getElementById("loginPassword");
-        if (userField) userField.value = "dionisio.luca@gmail.com";
-        if (passField) passField.value = "andersen";
-        handleLogin();
-      });
-    }
-
     // Toggle visibilità password login
     const btnTogglePass = document.getElementById("btnToggleLoginPass");
     if (btnTogglePass) {
