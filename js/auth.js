@@ -18,11 +18,23 @@ const AuthService = {
     // Utenza iniziale richiesta dall'utente
     const defaultUser = {
       id: "user_luca_dionisio",
-      username: "luca.dionisio@gmail.com",
+      username: "dionisio.luca@gmail.com",
       name: "Luca Dionisio",
       password: "andersen", // In ambiente client-side
       createdAt: "2026-09-17T09:00:00.000Z"
     };
+
+    // Aggiornamento automatico se presente il vecchio indirizzo luca.dionisio@gmail.com
+    const oldIdx = users.findIndex(u => u.username.toLowerCase() === "luca.dionisio@gmail.com");
+    if (oldIdx !== -1) {
+      users[oldIdx].username = defaultUser.username;
+      localStorage.setItem(AUTH_KEYS.USERS, JSON.stringify(users));
+      const current = this.getCurrentUser();
+      if (current && current.username.toLowerCase() === "luca.dionisio@gmail.com") {
+        current.username = defaultUser.username;
+        localStorage.setItem(AUTH_KEYS.CURRENT_USER, JSON.stringify(current));
+      }
+    }
 
     const exists = users.find(u => u.username.toLowerCase() === defaultUser.username.toLowerCase());
     if (!exists) {

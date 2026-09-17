@@ -1,4 +1,4 @@
-﻿# GymTracker Web App 🏋️‍♂️
+# GymTracker Web App 🏋️‍♂️
 
 Applicazione web progressiva (PWA / mobile-first) progettata per il monitoraggio avanzato degli allenamenti in palestra, con autenticazione multi-utente, guida passo per passo agli esercizi, illustrazioni vettoriali degli attrezzi, timer di recupero e grafici interattivi sull'evoluzione dei carichi reali.
 
@@ -10,7 +10,7 @@ Disponibile online su GitHub Pages:
 ## 🔐 Credenziali Predefinite
 
 L'applicazione è configurata con un profilo utente iniziale predefinito:
-- **Email / Nome Utente:** `luca.dionisio@gmail.com`
+- **Email / Nome Utente:** `dionisio.luca@gmail.com`
 - **Password:** `andersen`
 
 È inoltre presente il pulsante **"⚡ Accesso rapido (Luca)"** nella schermata di login per accedere con un singolo tocco su smartphone.

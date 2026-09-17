@@ -337,7 +337,7 @@ const App = {
         e.preventDefault();
         const userField = document.getElementById("loginUsername");
         const passField = document.getElementById("loginPassword");
-        if (userField) userField.value = "luca.dionisio@gmail.com";
+        if (userField) userField.value = "dionisio.luca@gmail.com";
         if (passField) passField.value = "andersen";
         handleLogin();
       });
