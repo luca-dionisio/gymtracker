@@ -43,7 +43,7 @@ const App = {
   },
 
   /**
-   * Collega tutti gli ascoltatori di eventi DOM
+   * Collega tutti gli ascoltatori di eventi DOM (in modo permanente ed universale)
    */
   bindEvents() {
     // Navigazione Bottom Tab Bar
@@ -61,6 +61,61 @@ const App = {
         this.startWorkout(sessionId);
       });
     });
+
+    // Pulsanti Avvio rapido da stato vuoto Sessione
+    document.querySelectorAll(".btn-start-empty-session").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const sessionId = btn.dataset.session;
+        this.startWorkout(sessionId);
+      });
+    });
+
+    // Stepper Peso Reale: pulsanti - e + rotondi principali
+    const btnMinus = document.getElementById("btnMinusWeight");
+    if (btnMinus) {
+      btnMinus.addEventListener("click", (e) => {
+        e.preventDefault();
+        const currentEx = this.getCurrentExercise();
+        const step = (currentEx && currentEx.isBodyweight) ? 5 : 2.5;
+        this.adjustWeight(-step);
+      });
+    }
+
+    const btnPlus = document.getElementById("btnPlusWeight");
+    if (btnPlus) {
+      btnPlus.addEventListener("click", (e) => {
+        e.preventDefault();
+        const currentEx = this.getCurrentExercise();
+        const step = (currentEx && currentEx.isBodyweight) ? 5 : 2.5;
+        this.adjustWeight(step);
+      });
+    }
+
+    // Bottoni incremento rapido (+1, +2.5, +5, -2.5)
+    document.querySelectorAll(".btn-pill-increment").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const delta = parseFloat(btn.dataset.delta || 0);
+        this.adjustWeight(delta);
+      });
+    });
+
+    // Input manuale peso
+    const realWeightInput = document.getElementById("realWeightInput");
+    if (realWeightInput) {
+      realWeightInput.addEventListener("input", (e) => {
+        this.setWeight(parseFloat(e.target.value));
+      });
+    }
+
+    // Pulsante Prossimo Esercizio
+    const btnNext = document.getElementById("btnNextExercise");
+    if (btnNext) {
+      btnNext.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.submitAndProceedToNext();
+      });
+    }
 
     // Segmented control per la visualizzazione della scheda
     document.querySelectorAll(".plan-tabs-segmented .segment-btn").forEach(btn => {
@@ -157,6 +212,63 @@ const App = {
   },
 
   /**
+   * Restituisce l'esercizio corrente dell'allenamento attivo
+   */
+  getCurrentExercise() {
+    if (!this.activeSession || !Array.isArray(this.activeSession.exercises)) return null;
+    return this.activeSession.exercises[this.currentExerciseIndex] || null;
+  },
+
+  /**
+   * Modifica il peso di delta kg (+ / -) in modo reattivo
+   */
+  adjustWeight(delta) {
+    const input = document.getElementById("realWeightInput");
+    if (!input) return;
+    let currentVal = parseFloat(input.value);
+    if (isNaN(currentVal)) currentVal = 0;
+    let newVal = Math.max(0, currentVal + delta);
+    newVal = Math.round(newVal * 10) / 10;
+    input.value = newVal;
+
+    const currentEx = this.getCurrentExercise();
+    if (currentEx) {
+      currentEx.actualWeight = newVal;
+      if (Array.isArray(currentEx.setsData)) {
+        currentEx.setsData.forEach(s => {
+          if (!s.completed) s.weight = newVal;
+        });
+      }
+      StorageService.saveActiveWorkout(this.activeSession);
+
+      // Aggiorna gli input visivi delle serie senza distruggere il DOM
+      const setInputs = document.querySelectorAll(".set-weight-input");
+      setInputs.forEach((inp, idx) => {
+        if (currentEx.setsData[idx] && !currentEx.setsData[idx].completed) {
+          inp.value = newVal;
+        }
+      });
+    }
+  },
+
+  /**
+   * Imposta manualmente il peso da input testuale
+   */
+  setWeight(val) {
+    const num = isNaN(val) ? 0 : Math.max(0, Math.round(val * 10) / 10);
+    const currentEx = this.getCurrentExercise();
+    if (currentEx) {
+      currentEx.actualWeight = num;
+      if (Array.isArray(currentEx.setsData)) {
+        currentEx.setsData.forEach(s => {
+          if (!s.completed) s.weight = num;
+        });
+      }
+      StorageService.saveActiveWorkout(this.activeSession);
+    }
+  },
+
+  /**
    * Cambia tab attiva e sincronizza l'interfaccia
    */
   switchTab(tabName) {
@@ -178,7 +290,18 @@ const App = {
     }
 
     // Azioni specifiche per tab
-    if (tabName === "summary") {
+    if (tabName === "workout") {
+      const emptyEl = document.getElementById("workoutEmptyState");
+      const activeEl = document.getElementById("workoutActiveContent");
+      if (this.activeSession && this.activeSession.exercises && this.activeSession.exercises.length > 0) {
+        if (emptyEl) emptyEl.style.display = "none";
+        if (activeEl) activeEl.style.display = "block";
+        this.renderCurrentExercise();
+      } else {
+        if (emptyEl) emptyEl.style.display = "block";
+        if (activeEl) activeEl.style.display = "none";
+      }
+    } else if (tabName === "summary") {
       this.updateSummaryCharts();
     } else if (tabName === "history") {
       this.renderHistoryList();
@@ -186,7 +309,7 @@ const App = {
       this.refreshDashboardStats();
     }
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
   },
 
   /**
@@ -195,26 +318,33 @@ const App = {
   refreshDashboardStats() {
     const history = StorageService.getHistory();
     const totalWorkouts = history.length;
-    document.getElementById("statTotalWorkouts").textContent = totalWorkouts;
+    const statTotal = document.getElementById("statTotalWorkouts");
+    if (statTotal) statTotal.textContent = totalWorkouts;
 
-    // Calcolo streak o ultima data
     if (history.length > 0) {
       const last = history[0];
       const d = new Date(last.date);
-      document.getElementById("statLastDate").textContent = `${d.getDate()}/${d.getMonth() + 1}`;
-      document.getElementById("statLastSession").textContent = `Sess. ${last.sessionId}`;
+      const statDate = document.getElementById("statLastDate");
+      const statSess = document.getElementById("statLastSession");
+      if (statDate) statDate.textContent = `${d.getDate()}/${d.getMonth() + 1}`;
+      if (statSess) statSess.textContent = `Sess. ${last.sessionId}`;
     } else {
-      document.getElementById("statLastDate").textContent = "-";
-      document.getElementById("statLastSession").textContent = "Nessuna";
+      const statDate = document.getElementById("statLastDate");
+      const statSess = document.getElementById("statLastSession");
+      if (statDate) statDate.textContent = "-";
+      if (statSess) statSess.textContent = "Nessuna";
     }
 
     // Badge sessione in corso nell'header
     const headerBadge = document.getElementById("headerActiveBadge");
-    if (this.activeSession) {
-      headerBadge.style.display = "inline-flex";
-      document.getElementById("headerSessionLetter").textContent = this.activeSession.sessionId;
-    } else {
-      headerBadge.style.display = "none";
+    if (headerBadge) {
+      if (this.activeSession) {
+        headerBadge.style.display = "inline-flex";
+        const letter = document.getElementById("headerSessionLetter");
+        if (letter) letter.textContent = this.activeSession.sessionId;
+      } else {
+        headerBadge.style.display = "none";
+      }
     }
   },
 
@@ -227,11 +357,9 @@ const App = {
 
     // Clona la configurazione degli esercizi per la sessione corrente
     const sessionExercises = config.exercises.map(ex => {
-      // Cerca se esiste un peso utilizzato nella sessione precedente
       const prev = StorageService.getLastWeightForExercise(ex.name);
       const initialWeight = prev ? prev.weight : ex.defaultWeight;
 
-      // Crea le serie
       const sets = [];
       for (let s = 1; s <= ex.sets; s++) {
         sets.push({
@@ -261,7 +389,6 @@ const App = {
     this.currentExerciseIndex = 0;
     StorageService.saveActiveWorkout(this.activeSession);
     this.refreshDashboardStats();
-    this.renderCurrentExercise();
     this.switchTab("workout");
   },
 
@@ -270,10 +397,8 @@ const App = {
    */
   restoreActiveWorkout(savedState) {
     this.activeSession = savedState;
-    // Trova il primo esercizio non ancora confermato
     const firstUnfinished = this.activeSession.exercises.findIndex(e => !e.confirmed);
     this.currentExerciseIndex = firstUnfinished !== -1 ? firstUnfinished : 0;
-    this.renderCurrentExercise();
     this.refreshDashboardStats();
   },
 
@@ -287,54 +412,88 @@ const App = {
     const currentEx = this.activeSession.exercises[this.currentExerciseIndex];
     if (!currentEx) return;
 
+    // Assicura che la vista attiva sia visibile
+    const emptyEl = document.getElementById("workoutEmptyState");
+    const activeEl = document.getElementById("workoutActiveContent");
+    if (emptyEl) emptyEl.style.display = "none";
+    if (activeEl) activeEl.style.display = "block";
+
     // Header & Progresso
-    document.getElementById("workoutProgressText").textContent = `Esercizio ${this.currentExerciseIndex + 1} di ${totalExercises}`;
-    document.getElementById("workoutSessionTag").textContent = `Sessione ${this.activeSession.sessionId}`;
-    const progressPercent = ((this.currentExerciseIndex) / totalExercises) * 100;
-    document.getElementById("workoutProgressFill").style.width = `${progressPercent}%`;
+    const progressText = document.getElementById("workoutProgressText");
+    if (progressText) progressText.textContent = `Esercizio ${this.currentExerciseIndex + 1} di ${totalExercises}`;
+    
+    const sessionTag = document.getElementById("workoutSessionTag");
+    if (sessionTag) sessionTag.textContent = `Sessione ${this.activeSession.sessionId}`;
+    
+    const progressFill = document.getElementById("workoutProgressFill");
+    if (progressFill) {
+      const progressPercent = ((this.currentExerciseIndex) / totalExercises) * 100;
+      progressFill.style.width = `${progressPercent}%`;
+    }
 
     // Titolo e note
-    document.getElementById("exerciseTitle").textContent = currentEx.name;
-    document.getElementById("exerciseNotes").textContent = currentEx.notes;
+    const exTitle = document.getElementById("exerciseTitle");
+    if (exTitle) exTitle.textContent = currentEx.name;
+
+    const exNotes = document.getElementById("exerciseNotes");
+    if (exNotes) exNotes.textContent = currentEx.notes;
 
     // Attrezzo - Grafica SVG e Metadati
     const equipKey = currentEx.equipmentKey || "corpo_libero";
     const equipInfo = EQUIPMENT_CATALOG[equipKey] || { name: "Attrezzo da palestra", category: "Standard" };
     const artContainer = document.getElementById("equipmentArtContainer");
-    artContainer.innerHTML = EQUIPMENT_SVGS[equipKey] || EQUIPMENT_SVGS["corpo_libero"];
+    if (artContainer) {
+      artContainer.innerHTML = EQUIPMENT_SVGS[equipKey] || EQUIPMENT_SVGS["corpo_libero"];
+    }
 
-    document.getElementById("equipmentNameTag").textContent = equipInfo.name;
-    document.getElementById("equipmentCategoryTag").textContent = equipInfo.category;
+    const nameTag = document.getElementById("equipmentNameTag");
+    if (nameTag) nameTag.textContent = equipInfo.name;
+
+    const catTag = document.getElementById("equipmentCategoryTag");
+    if (catTag) catTag.textContent = equipInfo.category;
 
     // Target Chips
-    document.getElementById("targetSets").textContent = `${currentEx.sets} serie`;
-    document.getElementById("targetReps").textContent = currentEx.reps;
-    document.getElementById("targetWeight").textContent = currentEx.targetWeight;
-    document.getElementById("targetRest").textContent = `${currentEx.restSeconds}s`;
+    const tSets = document.getElementById("targetSets");
+    if (tSets) tSets.textContent = `${currentEx.sets} serie`;
+
+    const tReps = document.getElementById("targetReps");
+    if (tReps) tReps.textContent = currentEx.reps;
+
+    const tWeight = document.getElementById("targetWeight");
+    if (tWeight) tWeight.textContent = currentEx.targetWeight;
+
+    const tRest = document.getElementById("targetRest");
+    if (tRest) tRest.textContent = `${currentEx.restSeconds}s`;
 
     // Riferimento Ultima Volta
     const lastSession = StorageService.getLastWeightForExercise(currentEx.name);
     const lastRefEl = document.getElementById("lastWeightRef");
-    if (lastSession) {
-      lastRefEl.style.display = "flex";
-      document.getElementById("lastWeightValue").textContent = `${lastSession.weight} kg (${lastSession.date})`;
-    } else {
-      lastRefEl.style.display = "none";
+    if (lastRefEl) {
+      if (lastSession) {
+        lastRefEl.style.display = "flex";
+        const valEl = document.getElementById("lastWeightValue");
+        if (valEl) valEl.textContent = `${lastSession.weight} kg (${lastSession.date})`;
+      } else {
+        lastRefEl.style.display = "none";
+      }
     }
 
     // Inserimento Peso Reale
     const weightInput = document.getElementById("realWeightInput");
     const weightUnit = document.getElementById("realWeightUnit");
     const inputSection = document.getElementById("weightInputSection");
-    inputSection.classList.remove("error-highlight");
-    document.getElementById("weightValidationAlert").classList.remove("show");
+    const alertBox = document.getElementById("weightValidationAlert");
+    if (inputSection) inputSection.classList.remove("error-highlight");
+    if (alertBox) alertBox.classList.remove("show");
 
-    if (currentEx.isBodyweight) {
-      weightUnit.textContent = "sec / kg";
-      weightInput.value = currentEx.actualWeight || 0;
-    } else {
-      weightUnit.textContent = "kg";
-      weightInput.value = currentEx.actualWeight || currentEx.defaultWeight || 0;
+    if (weightInput) {
+      if (currentEx.isBodyweight) {
+        if (weightUnit) weightUnit.textContent = "sec / kg";
+        weightInput.value = currentEx.actualWeight || 0;
+      } else {
+        if (weightUnit) weightUnit.textContent = "kg";
+        weightInput.value = currentEx.actualWeight || currentEx.defaultWeight || 0;
+      }
     }
 
     // Serie Log Checklist
@@ -343,68 +502,13 @@ const App = {
     // Testo Pulsante Prossimo / Fine
     const isLast = this.currentExerciseIndex === totalExercises - 1;
     const nextBtn = document.getElementById("btnNextExercise");
-    nextBtn.innerHTML = isLast
-      ? `<span>Concludi Allenamento</span>
-         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`
-      : `<span>Completa & Prossimo Esercizio</span>
-         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
-
-    // Gestione Eventi Stepper Peso
-    this.bindStepperButtons(currentEx);
-  },
-
-  /**
-   * Collega i pulsanti per incrementare / decrementare il peso
-   */
-  bindStepperButtons(currentEx) {
-    const input = document.getElementById("realWeightInput");
-
-    const updateWeight = (val) => {
-      let num = parseFloat(val);
-      if (isNaN(num) || num < 0) num = 0;
-      num = Math.round(num * 10) / 10;
-      input.value = num;
-      currentEx.actualWeight = num;
-      // Aggiorna anche le serie non ancora completate
-      currentEx.setsData.forEach(s => {
-        if (!s.completed) s.weight = num;
-      });
-      StorageService.saveActiveWorkout(this.activeSession);
-      this.renderSetsTracker(currentEx);
-    };
-
-    // Tasti - e + rotondi principali
-    document.getElementById("btnMinusWeight").onclick = () => {
-      const step = currentEx.isBodyweight ? 5 : 2.5;
-      updateWeight(parseFloat(input.value || 0) - step);
-    };
-
-    document.getElementById("btnPlusWeight").onclick = () => {
-      const step = currentEx.isBodyweight ? 5 : 2.5;
-      updateWeight(parseFloat(input.value || 0) + step);
-    };
-
-    // Bottoni incremento rapido (+1, +2.5, +5, -2.5)
-    document.querySelectorAll(".btn-pill-increment").forEach(btn => {
-      btn.onclick = () => {
-        const delta = parseFloat(btn.dataset.delta);
-        updateWeight(parseFloat(input.value || 0) + delta);
-      };
-    });
-
-    // Input manuale da tastiera
-    input.oninput = () => {
-      const val = parseFloat(input.value);
-      if (!isNaN(val)) {
-        currentEx.actualWeight = val;
-        StorageService.saveActiveWorkout(this.activeSession);
-      }
-    };
-
-    // Pulsante Procedi al prossimo esercizio con VALIDAZIONE OBBLIGATORIA
-    document.getElementById("btnNextExercise").onclick = () => {
-      this.submitAndProceedToNext(currentEx);
-    };
+    if (nextBtn) {
+      nextBtn.innerHTML = isLast
+        ? `<span>Concludi Allenamento</span>
+           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`
+        : `<span>Completa & Prossimo Esercizio</span>
+           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
+    }
   },
 
   /**
@@ -412,9 +516,10 @@ const App = {
    */
   renderSetsTracker(currentEx) {
     const container = document.getElementById("setsRowsContainer");
+    if (!container) return;
     container.innerHTML = "";
 
-    currentEx.setsData.forEach((setData, idx) => {
+    (currentEx.setsData || []).forEach((setData, idx) => {
       const row = document.createElement("div");
       row.className = "set-item-row";
       row.innerHTML = `
@@ -437,25 +542,29 @@ const App = {
 
       // Input peso per singola serie
       const weightInput = row.querySelector(".set-weight-input");
-      weightInput.addEventListener("change", (e) => {
-        const val = parseFloat(e.target.value) || 0;
-        setData.weight = val;
-        StorageService.saveActiveWorkout(this.activeSession);
-      });
+      if (weightInput) {
+        weightInput.addEventListener("change", (e) => {
+          const val = parseFloat(e.target.value) || 0;
+          setData.weight = val;
+          StorageService.saveActiveWorkout(this.activeSession);
+        });
+      }
 
       // Spunta completamento serie
       const checkBtn = row.querySelector(".set-check-btn");
-      checkBtn.addEventListener("click", () => {
-        setData.completed = !setData.completed;
-        checkBtn.classList.toggle("completed", setData.completed);
-        
-        // Se si completa la serie, avvia automaticamente il timer di recupero!
-        if (setData.completed) {
-          GymTimer.playBeep(660, 0.1);
-          this.triggerRestTimer(currentEx.restSeconds);
-        }
-        StorageService.saveActiveWorkout(this.activeSession);
-      });
+      if (checkBtn) {
+        checkBtn.addEventListener("click", () => {
+          setData.completed = !setData.completed;
+          checkBtn.classList.toggle("completed", setData.completed);
+          
+          // Se si completa la serie, avvia il timer di recupero
+          if (setData.completed) {
+            try { GymTimer.playBeep(660, 0.1); } catch(e) {}
+            try { this.triggerRestTimer(currentEx.restSeconds); } catch(e) {}
+          }
+          StorageService.saveActiveWorkout(this.activeSession);
+        });
+      }
 
       container.appendChild(row);
     });
@@ -463,47 +572,60 @@ const App = {
 
   /**
    * VALIDAZIONE E AVANZAMENTO:
-   * Prima di procedere all'esercizio successivo, richiede e valida
-   * il peso reale utilizzato durante la sessione di allenamento.
+   * Valida il peso reale utilizzato e procede all'esercizio successivo
    */
-  submitAndProceedToNext(currentEx) {
-    const input = document.getElementById("realWeightInput");
-    const weightVal = parseFloat(input.value);
-    const alertBox = document.getElementById("weightValidationAlert");
-    const inputSection = document.getElementById("weightInputSection");
-
-    // Validazione: il peso non può essere vuoto o NaN (per corpo libero è concesso 0 o secondi)
-    if (isNaN(weightVal) || (!currentEx.isBodyweight && weightVal <= 0)) {
-      alertBox.classList.add("show");
-      inputSection.classList.add("error-highlight");
-      input.focus();
-      if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
+  submitAndProceedToNext() {
+    if (!this.activeSession || !this.activeSession.exercises) {
+      this.startWorkout("A");
       return;
     }
 
-    // Validazione superata: salva il carico confermato
-    alertBox.classList.remove("show");
-    inputSection.classList.remove("error-highlight");
+    const currentEx = this.getCurrentExercise();
+    if (!currentEx) return;
+
+    const input = document.getElementById("realWeightInput");
+    const weightVal = parseFloat(input ? input.value : 0);
+    const alertBox = document.getElementById("weightValidationAlert");
+    const inputSection = document.getElementById("weightInputSection");
+
+    // Validazione: il peso non può essere vuoto o NaN (per corpo libero è concesso 0 o durata)
+    if (isNaN(weightVal) || (!currentEx.isBodyweight && weightVal <= 0)) {
+      if (alertBox) alertBox.classList.add("show");
+      if (inputSection) inputSection.classList.add("error-highlight");
+      if (input) input.focus();
+      try {
+        if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
+      } catch (e) {}
+      return;
+    }
+
+    // Validazione superata
+    if (alertBox) alertBox.classList.remove("show");
+    if (inputSection) inputSection.classList.remove("error-highlight");
 
     currentEx.actualWeight = weightVal;
     currentEx.confirmed = true;
 
     // Calcola il peso massimo utilizzato tra le serie
-    const seriesWeights = currentEx.setsData.map(s => Number(s.weight || weightVal));
+    const seriesWeights = (currentEx.setsData || []).map(s => Number(s.weight || weightVal));
     currentEx.maxWeight = Math.max(weightVal, ...seriesWeights);
 
     // Salva lo stato
     StorageService.saveActiveWorkout(this.activeSession);
 
-    // Avvia il recupero se previsto
-    this.triggerRestTimer(currentEx.restSeconds);
+    // Avvia il recupero in modo sicuro (senza bloccare se audio disabilitato)
+    try {
+      this.triggerRestTimer(currentEx.restSeconds || 90);
+    } catch (e) {
+      console.warn("Timer non avviato:", e);
+    }
 
     const total = this.activeSession.exercises.length;
     if (this.currentExerciseIndex < total - 1) {
       // Prossimo esercizio
       this.currentExerciseIndex++;
       this.renderCurrentExercise();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
     } else {
       // Ultimo esercizio completato: conclusione allenamento!
       this.finishWorkout();

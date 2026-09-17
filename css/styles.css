@@ -48,8 +48,18 @@ html, body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
-  user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button, .btn-stepper-round, .btn-pill-increment, .btn-primary, .btn-secondary, .session-select-card {
+  touch-action: manipulation;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* App Wrapper */

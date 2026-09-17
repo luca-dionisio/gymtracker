@@ -17,17 +17,21 @@ class RestTimer {
   }
 
   /**
-   * Inizializza o riattiva il contesto Web Audio (richiede interazione utente)
+   * Inizializza o riattiva il contesto Web Audio in modo sicuro (senza bloccare in caso di policy browser)
    */
   initAudio() {
-    if (!this.audioCtx) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        this.audioCtx = new AudioContext();
+    try {
+      if (!this.audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          this.audioCtx = new AudioContext();
+        }
       }
-    }
-    if (this.audioCtx && this.audioCtx.state === "suspended") {
-      this.audioCtx.resume();
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
+    } catch (e) {
+      // Audio disabilitato o policy restrittiva
     }
   }
 
