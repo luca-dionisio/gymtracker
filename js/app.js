@@ -111,6 +111,12 @@ const App = {
     if (loginCard) loginCard.style.display = "block";
     if (regCard) regCard.style.display = "none";
 
+    // Pulisce i campi di input login
+    const userInput = document.getElementById("loginUsername");
+    const passInput = document.getElementById("loginPassword");
+    if (userInput) userInput.value = "";
+    if (passInput) passInput.value = "";
+
     // Disattiva tutte le viste e attiva la vista login
     document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active"));
     const loginSec = document.getElementById("view-login");
