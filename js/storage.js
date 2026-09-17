@@ -12,11 +12,41 @@ const STORAGE_KEYS = {
 
 const StorageService = {
   /**
+   * Restituisce l'ID dell'utente attualmente autenticato
+   */
+  getCurrentUserId() {
+    const user = typeof AuthService !== "undefined" ? AuthService.getCurrentUser() : null;
+    return user ? user.id : "guest";
+  },
+
+  /**
+   * Genera la chiave di storage specifica per l'utente loggato
+   */
+  getUserKey(suffix) {
+    return `gym_tracker_${this.getCurrentUserId()}_${suffix}`;
+  },
+
+  /**
    * Recupera l'intero storico degli allenamenti ordinati dal più recente al più vecchio
    */
   getHistory() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
+      const key = this.getUserKey("history");
+      let data = localStorage.getItem(key);
+      
+      // Migrazione automatica: se l'utente è Luca e non ha ancora dati salvati con chiave dedicata,
+      // recupera l'eventuale storico precedente non segregato
+      if (!data) {
+        const user = typeof AuthService !== "undefined" ? AuthService.getCurrentUser() : null;
+        if (user && user.id === "user_luca_dionisio") {
+          const oldData = localStorage.getItem("gym_tracker_history_v1");
+          if (oldData) {
+            localStorage.setItem(key, oldData);
+            data = oldData;
+          }
+        }
+      }
+
       return data ? JSON.parse(data) : [];
     } catch (e) {
       console.error("Errore nel recupero dello storico:", e);
@@ -25,15 +55,13 @@ const StorageService = {
   },
 
   /**
-   * Salva un nuovo allenamento completato nello storico
+   * Salva un nuovo allenamento completato nello storico dell'utente
    */
   saveWorkout(workoutLog) {
     try {
       const history = this.getHistory();
-      // Inserisce in cima
       history.unshift(workoutLog);
-      localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
-      // Cancella l'allenamento attivo corrente
+      localStorage.setItem(this.getUserKey("history"), JSON.stringify(history));
       this.clearActiveWorkout();
       return true;
     } catch (e) {
@@ -48,7 +76,7 @@ const StorageService = {
   deleteWorkout(id) {
     try {
       const history = this.getHistory().filter(item => item.id !== id);
-      localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+      localStorage.setItem(this.getUserKey("history"), JSON.stringify(history));
       return true;
     } catch (e) {
       console.error("Errore nell'eliminazione dell'allenamento:", e);
@@ -57,11 +85,11 @@ const StorageService = {
   },
 
   /**
-   * Recupera l'allenamento attualmente in corso (se presente)
+   * Recupera l'allenamento attualmente in corso per l'utente corrente
    */
   getActiveWorkout() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_WORKOUT);
+      const data = localStorage.getItem(this.getUserKey("active"));
       return data ? JSON.parse(data) : null;
     } catch (e) {
       return null;
@@ -69,21 +97,21 @@ const StorageService = {
   },
 
   /**
-   * Salva lo stato dell'allenamento attivo per non perdere i progressi al reload
+   * Salva lo stato dell'allenamento attivo per l'utente
    */
   saveActiveWorkout(state) {
     try {
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_WORKOUT, JSON.stringify(state));
+      localStorage.setItem(this.getUserKey("active"), JSON.stringify(state));
     } catch (e) {
       console.error("Errore nel salvataggio stato attivo:", e);
     }
   },
 
   /**
-   * Elimina la sessione attiva
+   * Elimina la sessione attiva dell'utente corrente
    */
   clearActiveWorkout() {
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_WORKOUT);
+    localStorage.removeItem(this.getUserKey("active"));
   },
 
   /**
@@ -204,10 +232,10 @@ const StorageService = {
     try {
       const parsed = JSON.parse(jsonString);
       if (Array.isArray(parsed.history)) {
-        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(parsed.history));
+        localStorage.setItem(this.getUserKey("history"), JSON.stringify(parsed.history));
         return { success: true, count: parsed.history.length };
       } else if (Array.isArray(parsed)) {
-        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(parsed));
+        localStorage.setItem(this.getUserKey("history"), JSON.stringify(parsed));
         return { success: true, count: parsed.length };
       }
       return { success: false, error: "Formato non valido" };
@@ -283,15 +311,15 @@ const StorageService = {
       });
     });
 
-    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(demoWorkouts));
+    localStorage.setItem(this.getUserKey("history"), JSON.stringify(demoWorkouts));
     return demoWorkouts;
   },
 
   /**
-   * Resetta tutti i dati salvati
+   * Resetta tutti i dati salvati per l'utente corrente
    */
   clearAll() {
-    localStorage.removeItem(STORAGE_KEYS.HISTORY);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_WORKOUT);
+    localStorage.removeItem(this.getUserKey("history"));
+    localStorage.removeItem(this.getUserKey("active"));
   }
 };

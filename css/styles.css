@@ -1370,3 +1370,131 @@ button, .btn-stepper-round, .btn-pill-increment, .btn-primary, .btn-secondary, .
   color: var(--accent-emerald);
   font-weight: 700;
 }
+
+/* ==========================================================================
+   Header User Profile & Login View Styles
+   ========================================================================== */
+
+.user-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card-elevated);
+  border: 1px solid var(--border-active);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.user-avatar-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #2563eb 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.user-name-text {
+  color: var(--text-main);
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-logout-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-logout-icon:hover, .btn-logout-icon:active {
+  color: var(--accent-rose);
+  background: rgba(244, 63, 94, 0.15);
+}
+
+/* Login Page Styles */
+.login-wrapper {
+  max-width: 420px;
+  margin: 10px auto;
+  padding: 10px 4px;
+}
+
+.login-hero {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-icon-large {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+  border: 2px solid var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  box-shadow: 0 0 24px var(--accent-cyan-glow);
+}
+
+.login-icon-large svg {
+  width: 34px;
+  height: 34px;
+  color: var(--accent-cyan);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  letter-spacing: 0.03em;
+}
+
+.input-styled {
+  background: var(--bg-main);
+  border: 1.5px solid var(--border-active);
+  color: var(--text-main);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.input-styled:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+}
+
+.btn-text-sm {
+  font-family: inherit;
+  transition: opacity 0.15s ease;
+}
+
+.btn-text-sm:active {
+  opacity: 0.7;
+}

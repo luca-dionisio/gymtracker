@@ -19,13 +19,57 @@ const App = {
    * Inizializzazione dell'applicazione
    */
   init() {
+    if (typeof AuthService !== "undefined") {
+      AuthService.init();
+    }
     this.bindEvents();
+
+    const currentUser = (typeof AuthService !== "undefined") ? AuthService.getCurrentUser() : null;
+    if (!currentUser) {
+      this.showLoginView();
+      return;
+    }
+
+    this.onUserLoggedIn(currentUser);
+  },
+
+  /**
+   * Configura l'app quando l'utente è autenticato
+   */
+  onUserLoggedIn(user) {
+    // Mostra la barra di navigazione inferiore
+    const bottomNav = document.querySelector(".bottom-nav");
+    if (bottomNav) bottomNav.style.display = "flex";
+
+    // Mostra e configura il badge profilo nell'header
+    const headerProfile = document.getElementById("headerUserProfile");
+    if (headerProfile) headerProfile.style.display = "flex";
+
+    const avatarEl = document.getElementById("headerUserAvatar");
+    if (avatarEl) {
+      const initial = (user.name || user.username || "U").trim().charAt(0).toUpperCase();
+      avatarEl.textContent = initial;
+    }
+
+    const nameEl = document.getElementById("headerUserName");
+    if (nameEl) {
+      const displayName = (user.name || user.username.split("@")[0] || "Atleta").trim().split(" ")[0];
+      nameEl.textContent = displayName;
+    }
+
+    // Saluto personalizzato in Dashboard
+    const greetingEl = document.getElementById("dashboardGreeting");
+    if (greetingEl) {
+      const displayName = (user.name || user.username.split("@")[0] || "Atleta").trim().split(" ")[0];
+      greetingEl.textContent = `Ciao, ${displayName}! 👋`;
+    }
+
     this.initTimerUI();
     this.populateExerciseSelect();
     this.renderPlanView("A");
     this.refreshDashboardStats();
 
-    // Controlla se c'è una sessione attiva salvata
+    // Controlla se c'è una sessione attiva salvata per questo utente
     const savedActive = StorageService.getActiveWorkout();
     if (savedActive && savedActive.exercises && savedActive.exercises.length > 0) {
       this.restoreActiveWorkout(savedActive);
@@ -33,13 +77,47 @@ const App = {
       this.switchTab("dashboard");
     }
 
-    // Se non ci sono dati storici, mostra un avviso amichevole
-    const history = StorageService.getHistory();
-    if (history.length === 0) {
-      // Inizializza con visualizzazione vuota
-    } else {
-      this.updateSummaryCharts();
+    this.updateSummaryCharts();
+  },
+
+  /**
+   * Mostra la schermata di login e nasconde le altre sezioni e la barra di navigazione
+   */
+  showLoginView() {
+    // Nascondi badge utente e badge sessione
+    const headerProfile = document.getElementById("headerUserProfile");
+    if (headerProfile) headerProfile.style.display = "none";
+    const headerBadge = document.getElementById("headerActiveBadge");
+    if (headerBadge) headerBadge.style.display = "none";
+
+    // Nascondi la barra di navigazione inferiore
+    const bottomNav = document.querySelector(".bottom-nav");
+    if (bottomNav) bottomNav.style.display = "none";
+
+    // Ferma timer se in esecuzione
+    if (typeof GymTimer !== "undefined") {
+      GymTimer.stop();
     }
+    const timerBanner = document.getElementById("timerFloatingBanner");
+    if (timerBanner) timerBanner.classList.remove("active");
+
+    // Nascondi alert di errore login
+    const errAlert = document.getElementById("loginErrorAlert");
+    if (errAlert) errAlert.classList.remove("show");
+
+    // Ripristina card di login e nascondi card registrazione
+    const loginCard = document.getElementById("loginFormCard");
+    const regCard = document.getElementById("registerFormCard");
+    if (loginCard) loginCard.style.display = "block";
+    if (regCard) regCard.style.display = "none";
+
+    // Disattiva tutte le viste e attiva la vista login
+    document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active"));
+    const loginSec = document.getElementById("view-login");
+    if (loginSec) loginSec.classList.add("active");
+
+    this.activeSession = null;
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
   },
 
   /**
@@ -209,6 +287,141 @@ const App = {
         this.switchTab("summary");
       });
     }
+
+    // --- GESTIONE AUTENTICAZIONE E PROFILI UTENTE ---
+    const formLogin = document.getElementById("formLogin");
+    const btnLoginSubmit = document.getElementById("btnLoginSubmit");
+    const handleLogin = () => {
+      const userField = document.getElementById("loginUsername");
+      const passField = document.getElementById("loginPassword");
+      const username = userField ? userField.value : "";
+      const password = passField ? passField.value : "";
+
+      const res = AuthService.login(username, password);
+      const errAlert = document.getElementById("loginErrorAlert");
+      const errText = document.getElementById("loginErrorText");
+
+      if (res.success) {
+        if (errAlert) errAlert.classList.remove("show");
+        this.onUserLoggedIn(res.user);
+      } else {
+        if (errText) errText.textContent = res.error || "Credenziali non valide.";
+        if (errAlert) errAlert.classList.add("show");
+      }
+    };
+
+    if (btnLoginSubmit) {
+      btnLoginSubmit.addEventListener("click", (e) => {
+        e.preventDefault();
+        handleLogin();
+      });
+    }
+
+    if (formLogin) {
+      formLogin.addEventListener("submit", (e) => {
+        e.preventDefault();
+        handleLogin();
+      });
+    }
+
+    // Accesso rapido 1-tap preimpostato per Luca Dionisio
+    const btnQuickLuca = document.getElementById("btnQuickLoginLuca");
+    if (btnQuickLuca) {
+      btnQuickLuca.addEventListener("click", (e) => {
+        e.preventDefault();
+        const userField = document.getElementById("loginUsername");
+        const passField = document.getElementById("loginPassword");
+        if (userField) userField.value = "luca.dionisio@gmail.com";
+        if (passField) passField.value = "andersen";
+        handleLogin();
+      });
+    }
+
+    // Toggle visibilità password login
+    const btnTogglePass = document.getElementById("btnToggleLoginPass");
+    if (btnTogglePass) {
+      btnTogglePass.addEventListener("click", () => {
+        const passInput = document.getElementById("loginPassword");
+        if (!passInput) return;
+        if (passInput.type === "password") {
+          passInput.type = "text";
+          btnTogglePass.textContent = "Nascondi";
+        } else {
+          passInput.type = "password";
+          btnTogglePass.textContent = "Mostra";
+        }
+      });
+    }
+
+    // Switch card tra Login e Registrazione
+    const btnShowReg = document.getElementById("btnShowRegister");
+    const btnShowLog = document.getElementById("btnShowLogin");
+    const loginCard = document.getElementById("loginFormCard");
+    const regCard = document.getElementById("registerFormCard");
+    const errAlert = document.getElementById("loginErrorAlert");
+
+    if (btnShowReg) {
+      btnShowReg.addEventListener("click", () => {
+        if (loginCard) loginCard.style.display = "none";
+        if (regCard) regCard.style.display = "block";
+        if (errAlert) errAlert.classList.remove("show");
+      });
+    }
+
+    if (btnShowLog) {
+      btnShowLog.addEventListener("click", () => {
+        if (regCard) regCard.style.display = "none";
+        if (loginCard) loginCard.style.display = "block";
+        if (errAlert) errAlert.classList.remove("show");
+      });
+    }
+
+    // Submit Registrazione nuovo utente
+    const formReg = document.getElementById("formRegister");
+    const btnRegSubmit = document.getElementById("btnRegisterSubmit");
+    const handleRegister = () => {
+      const name = document.getElementById("regName")?.value;
+      const username = document.getElementById("regUsername")?.value;
+      const password = document.getElementById("regPassword")?.value;
+
+      const res = AuthService.register(name, username, password);
+      const errAlert = document.getElementById("loginErrorAlert");
+      const errText = document.getElementById("loginErrorText");
+
+      if (res.success) {
+        if (errAlert) errAlert.classList.remove("show");
+        this.onUserLoggedIn(res.user);
+      } else {
+        if (errText) errText.textContent = res.error || "Errore durante la registrazione.";
+        if (errAlert) errAlert.classList.add("show");
+      }
+    };
+
+    if (btnRegSubmit) {
+      btnRegSubmit.addEventListener("click", (e) => {
+        e.preventDefault();
+        handleRegister();
+      });
+    }
+
+    if (formReg) {
+      formReg.addEventListener("submit", (e) => {
+        e.preventDefault();
+        handleRegister();
+      });
+    }
+
+    // Logout utente dall'icona nell'header
+    const btnLogout = document.getElementById("btnLogoutHeader");
+    if (btnLogout) {
+      btnLogout.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (confirm("Vuoi disconnetterti dal profilo?")) {
+          AuthService.logout();
+          this.showLoginView();
+        }
+      });
+    }
   },
 
   /**
@@ -272,6 +485,12 @@ const App = {
    * Cambia tab attiva e sincronizza l'interfaccia
    */
   switchTab(tabName) {
+    // Se non autenticato, reindirizza alla schermata di login
+    if (typeof AuthService !== "undefined" && !AuthService.getCurrentUser()) {
+      this.showLoginView();
+      return;
+    }
+
     this.activeTab = tabName;
 
     // Aggiorna classi active nei bottoni nav
